@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+
+# Configuration
+TERMINAL="xfce4-terminal --hide-borders --geometry=x2+0+0 -x"
+
+# Constants
+TIME_REG="(0?[0-9]|1[0-9]|2[0-3])(:(0?[0-9]|[1-5][0-9])(:(0?[0-9]|[1-5][0-9]))?)?"
+BLOCKS=(" " "▏" "▎" "▍" "▌" "▋" "▊" "▉")
+
+# Main function
+main() {
+  # Start in terminal if not already in one
+  if [[ ! -t 1 ]]; then
+    exec $TERMINAL "$0" "$@"
+  fi
+
+  # Print usage info if requested
+  [[ "$1" =~ ^help|-h|--help$ ]] && usage && exit
+
+  # Get time specification
+  local spec interactive
+  if (( $# == 0 )); then
+    interactive=true
+  else
+    interactive=false
+    spec=("$@")
+  fi
+
+  # Program loop
+  while true; do
+    # Read timestamps from user if interactive
+    if $interactive; then
+      read -rep "Time range: " -a spec
+      [[ "${spec[@]}" =~ ^exit|quit$ ]] && break
+      history -s "${spec[*]}"
+    fi
+
+    # Get timestamps
+    local timestamps res; timestamps=( $(get_timestamps "${spec[@]}") )
+    case "$?" in
+      101 )
+        echo >&2 "Invalid time range specification"
+        $interactive && continue || exit 1;;
+      100 ) echo >&2 "Exactly one or two parameters expected"; continue;;
+      0   ) ;;
+      *   ) exit "$?";;
+    esac
+
+    # Countdown
+    countdown "${timestamps[0]}" "${timestamps[1]}"
+
+    # Only loop if interactive
+    $interactive || break
+  done
+}
+
+# Get times
+get_timestamps() {
+  # Check parameter count
+  (( $# == 1 || $# == 2 )) || return 100
+
+  # Get start time
+  local start
+  if (( $# == 2 )); then
+    # Check start parameter format
+    [[ "$1" =~ ^$TIME_REG$ ]] || return 101
+
+    # Set to given time
+    start="$(date +%s -d "$1")" || abort 50 "Converting time failed"
+    shift
+  else
+    # Set to current time
+    start="$(date +%s)" || abort 50 "Getting current time failed"
+  fi
+
+  # Check end parameter format
+  [[ "$1" =~ ^\+?$TIME_REG$ ]] || return 101
+
+  # Set absolute or relative end time
+  local end
+  if [[ "$1" =~ ^\+ ]]; then
+    end="$(( start + "$(date +%s -d "${1:1}")" - "$(date +%s -d 0)" ))" ||
+      abort 50 "Converting time failed"
+  else
+    end="$(date +%s -d "$1")" || abort 50 "Converting time failed"
+    if (( end < start )); then
+      end="$(date +%s -d "tomorrow $1")" || abort 50 "Calculating time failed"
+    fi
+  fi
+
+  # Return times
+  echo "$start" "$end"
+}
+
+# Count down
+countdown() { local start="$1" end="$2"
+  # Save terminal content
+  tput smcup
+  trap "tput rmcup" EXIT
+
+  # Calculate total time
+  local total="$(( end - start ))"
+
+  # Print every second
+  while true; do
+    # Calculate time left
+    local now; now="$(date +%s)" || abort 50 "Getting current time failed"
+    local left="$(( end - now ))"
+    (( left < 0 )) && left=0;
+
+    # Draw progressbar
+    draw "$left" "$total"
+
+    # Wait for one second but abort countdown on escape
+    read -rst 1 -n 1 input
+    [[ "$input" == $'\e' || "$input" == "q" ]] && break
+  done
+
+  # Restore terminal content
+  trap - EXIT
+  tput rmcup
+}
+
+# Draw progressbar
+draw() { local left="$1" total="$2"
+  # Get terminal dimensions
+  local w; w="$(tput cols)" || abort 40 "Getting terminal dimensions failed"
+  local h; h="$(tput lines)" || abort 40 "Getting terminal dimensions failed"
+
+  # Get progress bar cell width and color
+  local cells="$(( w * left / total ))"
+  (( cells > w )) && cells="$w"
+  local mod="$(( (8 * w * left / total) % 8 ))"
+
+  # Get color
+  local color;
+  if    (( left * 2   >= total )); then color="1;32";
+  elif  (( left * 10  >= total )); then color="1;33";
+  else                                  color="1;31";
+  fi
+  
+  # Draw progress bar
+  local screen="\e[${color}m"
+  for (( r = 1; r <= h; r++ )); do
+    for (( c = 1; c <= w; c++ )); do
+      if (( r - 1 == (h - 1) / 2 && c - 1 == w / 2 - 4 )); then
+        screen+="$(date +%H:%M:%S -ud @$left)" ||
+          abort 50 "Formatting time failed"
+        let c+=7
+      elif (( c <= cells     )); then screen+="█"
+      elif (( c == cells + 1 )); then screen+="${BLOCKS[mod]}"
+      else                            screen+=" "
+      fi
+    done
+    (( c < w )) && screen+="\n"
+  done
+  screen+="\e[0m"
+  tput cup 0 0
+  echo -ne "$screen"
+}
+
+# Print usage info
+usage() {
+cat <<END
+Usage: progressbar [[START] END]"
+
+Counts down to END, showing a graphical progressbar until q or esc is pressed.
+
+The optional START parameter takes the form HOURS[:MINS[:SECS]]. If it is not
+specified, the current time is used.
+
+The END parameter takes the form [+]HOURS[:MINS[:SECS]]. With the leading plus
+it is interpreted as an offset relative to the START time. Without the leading
+plus it is interpreted as a time of day.
+
+If no parameters are specified, the program runs in interactive mode and
+prompts the user for time specifications until they enter "exit".
+END
+}
+
+# Exit with error
+abort() { echo >&2 "[Error] $2"; exit $1; }
+
+# Call main function
+main "$@"
