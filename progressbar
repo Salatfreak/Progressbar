@@ -171,10 +171,10 @@ specified, the current time is used.
 
 The END parameter takes the form [+]HOURS[:MINS[:SECS]]. With the leading plus
 it is interpreted as an offset relative to the START time. Without the leading
-plus it is interpreted as a time of day.
+plus, it is interpreted as a time of day.
 
 If no parameters are specified, the program runs in interactive mode and
-prompts the user for time specifications until they enter "exit".
+prompts the user for time specifications until they enter "exit" or "quit".
 END
 }
 
