@@ -4,7 +4,11 @@ A terminal based countdown with a progressbar
 ![Progressbar](https://salatfreak.github.io/images/progressbar/progressbar.jpg)
 
 ## Usage
-progressbar [[START] END]
+progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-h] [[START] END] 
+ -r, --rows   Set height of the terminal if opening one
+ -c, --cols   Set width of the terminal if opening one
+ -z, --zoom   Set zoom of the terminal if opening one
+ -h, --help   Show this help and exit
 
 Counts down to END, showing a graphical progressbar until q or esc is pressed.
 
@@ -17,3 +21,7 @@ plus, it is interpreted as a time of day.
 
 If no parameters are specified, the program runs in interactive mode and
 prompts the user for time specifications until they enter "exit" or "quit".
+
+The program checks if it is running in a terminal at startup and starts itself
+in an xfce4-terminal, if it doesn't. Feel free to specify another terminal
+emulator in the TERMINAL variable at the top of the program code.
