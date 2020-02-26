@@ -4,11 +4,14 @@ A terminal based countdown with a progressbar
 ![Progressbar](https://salatfreak.github.io/images/progressbar/progressbar.jpg)
 
 ## Usage
-`progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-h] [[START] END]`  
- -r, --rows   Set height of the terminal if opening one  
- -c, --cols   Set width of the terminal if opening one  
- -z, --zoom   Set zoom of the terminal if opening one  
- -h, --help   Show this help and exit  
+`progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-h] [[START] END]`
+
+| Short | Long   | Description                               |
+|-------|--------|-------------------------------------------|
+| -r    | --rows | Set height of the terminal if opening one |
+| -c    | --cols | Set width of the terminal if opening one  |
+| -z    | --zoom | Set zoom of the terminal if opening one   |
+| -h    | --help | Show this help and exit                   |
 
 Counts down to END, showing a graphical progressbar until q or esc is pressed.
 
