@@ -3,6 +3,7 @@
 # Configuration
 TERMINAL="xfce4-terminal --title=Progressbar --hide-borders"
 TERMINAL+=" --geometry={c}x{r}+0+0 --zoom={z} -x"
+DONE_COMMAND=()
 
 # Constants
 TIME_REG="(0?[0-9]|1[0-9]|2[0-3])(:(0?[0-9]|[1-5][0-9])(:(0?[0-9]|[1-5][0-9]))?)?"
@@ -12,18 +13,19 @@ BLOCKS=(" " "▏" "▎" "▍" "▌" "▋" "▊" "▉")
 main() {
   # Parse parameters
   local params; params="$(
-    getopt -q -o r:c:z:h -l rows:,cols:,zoom:,help -- "$@"
+    getopt -q -o r:c:z:m:h -l rows:,cols:,zoom:,margin:,help -- "$@"
   )" || abort 10 "Invalid options"
   eval set -- "$params"
 
   # Get options
-  local rows=2 cols=80 zoom=0
+  local rows=2 cols=80 zoom=0 margin
   while [[ "$1" != "--" ]]; do
     case "$1" in
-      -r | --rows ) shift; rows="$1";;
-      -c | --cols ) shift; cols="$1";;
-      -z | --zoom ) shift; zoom="$1";;
-      -h | --help ) usage; exit;;
+      -r | --rows   ) shift; rows="$1";;
+      -c | --cols   ) shift; cols="$1";;
+      -z | --zoom   ) shift; zoom="$1";;
+      -m | --margin ) shift; margin="$1";;
+      -h | --help   ) usage; exit;;
     esac
     shift
   done
@@ -36,10 +38,18 @@ main() {
     abort 20 "Cols must be integer greater or equal to four"
   [[ "$zoom" =~ ^(-|\+)?[0-7]$ ]] ||
     abort 20 "Zoom must be integer between -7 and 7"
+  [[ ! -v margin || "$margin" =~ ^0|[1-9][0-9]*$ ]] ||
+    abort 20 "Margin must be a non-negative integer"
 
   # Start in terminal if not already in one
   if [[ ! -t 1 ]]; then
     start_terminal "$rows" "$cols" "$zoom" "$0" "$@"
+  fi
+
+  # Adapt margin if requested
+  if [[ -v margin ]]; then
+    adjust_margin "$margin" &
+    trap "kill $!" EXIT
   fi
 
   # Get time specification
@@ -129,11 +139,20 @@ countdown() { local start="$1" end="$2"
   local total="$(( end - start ))"
 
   # Print every second
+  local cd_done=false
   while true; do
     # Calculate time left
     local now; now="$(date +%s)" || abort 50 "Getting current time failed"
     local left="$(( end - now ))"
-    (( left < 0 )) && left=0;
+
+    # Stop at zero and execute specified command
+    if (( left <= 0 )); then
+      left=0
+      if ! $cd_done && (( ${#DONE_COMMAND[@]} > 0 )); then
+        "${DONE_COMMAND[@]}" &
+      fi
+      cd_done=true
+    fi
 
     # Draw progressbar
     draw "$left" "$total"
@@ -198,14 +217,42 @@ start_terminal() { local rows="$1" cols="$2" zoom="$3"; shift 3
   exec $command "$@" || abort 30 "Starting terminal failed"
 }
 
+# Adjust desktop margin
+adjust_margin() { local margin="$1"
+  # Get current state
+  local desktop; desktop="$(
+    xprop -root _NET_CURRENT_DESKTOP | cut -d' ' -f3
+  )" || abort 60 "Getting current desktop failed"
+  local default_margin; default_margin="$(
+    xfconf-query -c xfwm4 -p /general/margin_top
+  )" || abort 60 "Getting current margin failed"
+
+  # Reset margin before exiting
+  trap "xfconf-query -c xfwm4 -p /general/margin_top -s $default_margin" EXIT
+
+  # Adapt margin based on current desktop
+  xprop -spy -root _NET_CURRENT_DESKTOP | # Subscribe to desktop switching
+    stdbuf -o0 cut -d' ' -f3 |            # Extract desktop number
+    while read -r d; do             # React to desktop switches
+      if (( d == desktop )); then
+        xfconf-query -c xfwm4 -p /general/margin_top -s $margin ||
+          abort 70 "Setting desktop margin failed"
+      else
+        xfconf-query -c xfwm4 -p /general/margin_top -s $default_margin ||
+          abort 70 "Setting desktop margin failed"
+      fi
+    done
+}
+
 # Print usage info
 usage() {
 cat <<END
-Usage: progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-h] [[START] END] 
- -r, --rows   Set height of the terminal if opening one
- -c, --cols   Set width of the terminal if opening one
- -z, --zoom   Set zoom of the terminal if opening one
- -h, --help   Show this help and exit
+Usage: progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-m MARGIN] [-h] [[START] END] 
+ -r, --rows     Set height of the terminal if opening one
+ -c, --cols     Set width of the terminal if opening one
+ -z, --zoom     Set zoom of the terminal if opening one
+ -m, --margin   Automatically adapt desktop margin on current desktop (XFCE)
+ -h, --help     Show this help and exit
 
 Counts down to END, showing a graphical progressbar until q or esc is pressed.
 
@@ -222,6 +269,10 @@ prompts the user for time specifications until they enter "exit" or "quit".
 The program checks if it is running in a terminal at startup and starts itself
 in an xfce4-terminal, if it doesn't. Feel free to specify another terminal
 emulator in the TERMINAL variable at the top of the program code.
+
+If you would like the program to execute some command when the countdown
+reaches zero, feel free to write it into the DONE_COMMAND array at the top of
+the script.
 END
 }
 
