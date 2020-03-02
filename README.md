@@ -4,14 +4,15 @@ A terminal based countdown with a progressbar
 ![Progressbar](https://salatfreak.github.io/images/progressbar/progressbar.jpg)
 
 ## Usage
-`progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-h] [[START] END]`
+`progressbar [-r ROWS] [-c COLS] [-z ZOOM] [-m MARGIN] [-h] [[START] END]`
 
-| Short | Long   | Description                               |
-|-------|--------|-------------------------------------------|
-| -r    | --rows | Set height of the terminal if opening one |
-| -c    | --cols | Set width of the terminal if opening one  |
-| -z    | --zoom | Set zoom of the terminal if opening one   |
-| -h    | --help | Show this help and exit                   |
+| Short | Long     | Description                                                  |
+|-------|----------|--------------------------------------------------------------|
+| -r    | --rows   | Set height of the terminal if opening one                    |
+| -c    | --cols   | Set width of the terminal if opening one                     |
+| -z    | --zoom   | Set zoom of the terminal if opening one                      |
+| -m    | --margin | Automatically adapt desktop margin on current desktop (XFCE) |
+| -h    | --help   | Show this help and exit                                      |
 
 Counts down to END, showing a graphical progressbar until q or esc is pressed.
 
@@ -28,3 +29,7 @@ prompts the user for time specifications until they enter "exit" or "quit".
 The program checks if it is running in a terminal at startup and starts itself
 in an xfce4-terminal, if it doesn't. Feel free to specify another terminal
 emulator in the TERMINAL variable at the top of the program code.
+
+If you would like the program to execute some command when the countdown
+reaches zero, feel free to write it into the DONE_COMMAND array at the top of
+the script.
