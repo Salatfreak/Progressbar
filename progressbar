@@ -12,6 +12,7 @@ BLOCKS=(" " "▏" "▎" "▍" "▌" "▋" "▊" "▉")
 # Main function
 main() {
   # Parse parameters
+  local orig_params=("$@")
   local params; params="$(
     getopt -q -o r:c:z:m:h -l rows:,cols:,zoom:,margin:,help -- "$@"
   )" || abort 10 "Invalid options"
@@ -43,12 +44,12 @@ main() {
 
   # Start in terminal if not already in one
   if [[ ! -t 1 ]]; then
-    start_terminal "$rows" "$cols" "$zoom" "$0" "$@"
+    start_terminal "$rows" "$cols" "$zoom" "$0" "${orig_params[@]}"
   fi
 
-  # Adapt margin if requested
+  # Enable margin adaptation if requested
   if [[ -v margin ]]; then
-    adjust_margin "$margin" &
+    adapt_margin "$margin" &
     trap "kill $!" EXIT
   fi
 
@@ -217,8 +218,8 @@ start_terminal() { local rows="$1" cols="$2" zoom="$3"; shift 3
   exec $command "$@" || abort 30 "Starting terminal failed"
 }
 
-# Adjust desktop margin
-adjust_margin() { local margin="$1"
+# Adapt desktop margin
+adapt_margin() { local margin="$1"
   # Get current state
   local desktop; desktop="$(
     xprop -root _NET_CURRENT_DESKTOP | cut -d' ' -f3
